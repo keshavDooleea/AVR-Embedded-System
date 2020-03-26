@@ -94,9 +94,28 @@ enum class segmentMur
     finMur    //!< Gere le comportement du robot jusqu'a la prochaine section.
 };
 
-// declaration des variables globales
+/**
+ * declaration des variables de type volatile utilisees dans l'ISR
+ * 
+ */
+volatile uint8_t temps;
+volatile uint8_t nbBouton;
+volatile bool commencer;
+volatile bool interruptionExterne;
+volatile int etatSonar;
+
+/**
+ * declaration des variables globales
+ * 
+ */
 lesCompteur compteur;
 LCM ecran(&DEMO_DDR, &DEMO_PORT);
+uint16_t distance;
+int estRentre;
+Etat section;
+segmentCouloir sortieCouloir;
+segmentCoupure choixCoupure;
+segmentMur choixMur;
 
 /**
  * Affiche la section presente .
