@@ -1,82 +1,107 @@
-/*
- * Noms : Reetesh Dooleea, Freddy Some, Hicham Hamoumi, Yacine Hamdani 
- * Équipe 2647
- * Projet : main.cpp
- * Description : Ce fichier contient les codes pour les quatres sections du parcours du projet final.
- */
+////////////////////////////////////////////////////////////////////////////////
+/// \file    main.cpp
+/// \author  Reetesh Dooleea
+/// \author  Freddy Some
+/// \author  Hicham Hamoumi
+/// \author  Yacine Hamdani
+///
+/// Implementations du code qui gere les instructions du parcour.
+/// Identification materiel :
+/// PORT A : [1:6] Infrarouges.
+/// PORT B : [1:2] DEL [4:6] SON [3:5] SONAR
+/// PORT C : [1:8] LCD
+/// PORT D : [2:4] Bouton blanc. [5:8] Moteur.
+////////////////////////////////////////////////////////////////////////////////
 
 #include <librairie.h>
 
-// les compteurs necessaires de chaque section
+/**
+ * \struct  lesCompteurs
+ * \brief   Les compteurs necessaires de chaque sections.
+ * 
+ * Regroupe les compteurs utilise 
+ * tout au long du parcours.
+ */
 struct lesCompteur
 {
-    uint8_t nombreSections = 0;
-    uint8_t nombreBoucle = 0;
-    uint8_t nombreCoupure = 0;
-    uint8_t nombreCouloir = 0;
-    uint8_t nombreSection = 0;
-    uint8_t finCouloir = 0;
+    uint8_t nombreBoucle = 0;  //!<  Permet de savoir la position du Robot sur les deux boucles.
+    uint8_t nombreCoupure = 0; //!<  Permet de savoir la position du Robot sur les coupures.
+    uint8_t nombreSection = 0; //!<  Permet de savoir la position du Robot sur le parcours.
+    uint8_t finCouloir = 0;    //!<  Permet de savoir la position du Robot sur le couloir.
 };
 
-// déclaration des sections
+/**
+ * \enum    Etat
+ * \brief   Déclaration des sections
+ * 
+ * Regroupe les sections du 
+ * parcours.
+ */
 enum class Etat
 {
-    couloir,
-    mur,
-    boucle, // deux boucles
-    coupure,
-    fin
+    couloir, //!<  Section couloir .
+    mur,     //!<  Section mur.
+    boucle,  //!<  Section deux boucles.
+    coupure, //!<  Section coupure.
+    fin      //!<  Section fin.
 };
 
-// pour distinguer les fins de la coupure
+/**
+ * \enum    segmentCoupure
+ * \brief   Déclaration des segments des coupures.
+ * 
+ * Regroupe les etats du la section coupures.
+ * Crucial pour distinguer les fins de coupures.
+ */
 enum class segmentCoupure
 {
-    segment1,
-    segment2,
-    transitionSegment2,
-    transitionSegment1,
+    segment1,           //!<  Segments UV ou Z2.
+    segment2,           //!<  Segments XY ou 45.
+    transitionSegment2, //!<  Segments WX ou 34.
+    transitionSegment1, //!<  Segments Z1 ou 6A.
 };
 
-//les parties de la section couloir
+/**
+ * \enum    segmentCouloir
+ * \brief   Déclaration des etats du couloir.
+ * 
+ * Regroupe les etats du la section couloir.
+ * Crucial pour detecter la fin du couloir.
+ */
 enum class segmentCouloir
 {
-    droite,
-    gauche,
-    analyseDroite,
-    analyseGauche,
-    suiteDroite,
-    suiteGauche,
-    finDuCouloir
+    droite,        //!< Virage a droite.
+    gauche,        //!< Vriage a gauche.
+    analyseDroite, //!< Verifie si un des capteurs est detecte .
+    analyseGauche, //!< Verifie si un des capteurs est detecte .
+    suiteDroite,   //!< Virage a droite si rien est detecte.
+    suiteGauche,   //!< Virage a gauche si rien est detecte.
+    finDuCouloir   //!< DS3 est detecte , engage la fin du couloir.
 };
 
-// les parties de la section sonar
+/**
+ * \enum    segmentMur
+ * \brief   Déclaration des etats du mur.
+ * 
+ * Regroupe les etats du la section mur.
+ * Crucial pour effectue le suivie de mur 
+ * et basculer au suivie de ligne.
+ */
 enum class segmentMur
 {
-    debutMur,
-    sonar,
-    finMur
+    debutMur, //!< Suiveur de ligne au debut de la section.
+    sonar,    //!< Effectue le suiveur de mur.
+    finMur    //!< Gere le comportement du robot jusqu'a la prochaine section.
 };
 
-// declaration des variables utilisees dans l'ISR
-volatile Etat section;
-volatile segmentCoupure choixCoupure;
-volatile segmentMur choixMur;
-volatile segmentCouloir sortieCouloir;
-
-// les variables de type volatile
-volatile uint8_t temps;
-volatile uint8_t nbBouton;
-volatile bool commencer;
-volatile bool interruptionExterne;
-volatile uint16_t distance;
-volatile int etatSonar;
-volatile int estRentre;
-
-//declaration des variables globales
+// declaration des variables globales
 lesCompteur compteur;
 LCM ecran(&DEMO_DDR, &DEMO_PORT);
 
-// affiche l'etat present
+/**
+ * Affiche la section presente .
+ * 
+ */
 void afficherSection()
 {
     ecran.clear();
@@ -106,7 +131,11 @@ void afficherSection()
     }
 }
 
-// changement des etats
+/**
+ * Permet de changer de section
+ * grace au bouton poussoir .
+ * 
+ */
 void changerSection()
 {
 
@@ -133,7 +162,11 @@ void changerSection()
     afficherSection();
 }
 
-// faire une rotation a gauche a la fin de chaque section
+/**
+ * Faire une rotation a gauche a la
+ * fin de chaque section
+ * 
+ */
 void transition()
 {
     // avancer pour aligner les roues avec la ligne adjacente gauche
@@ -153,7 +186,11 @@ void transition()
     }
 }
 
-// avancer et suivre la ligne pour aller tout droit
+/**
+ * Suit les lignes du parcours
+ * selon le capteur detectee.
+ * 
+ */
 void suiveurDeLigne()
 {
     if (!POS1 && !POS2 && POS3 && !POS4 && !POS5)
@@ -163,7 +200,6 @@ void suiveurDeLigne()
         delayMs(40);
     }
 
-    //else if (!POS1 && !POS2 && POS3 || POS4 && !POS5)
     else if (!POS1 && !POS2 && (POS3 || POS4) && !POS5)
     {
         // tourner legerement a droite - DS4 allume
@@ -171,7 +207,6 @@ void suiveurDeLigne()
         delayMs(10);
     }
 
-    //else if (!POS1 && POS2 || POS3 && !POS4 && !POS5)
     else if (!POS1 && (POS2 || POS3) && !POS4 && !POS5)
     {
         // tourner legerement a gauche - DS2 allume
@@ -180,14 +215,22 @@ void suiveurDeLigne()
     }
 }
 
-// donnne une petite poussee au robot
+/**
+ * Donnne une petite poussee 
+ * au robot.
+ * 
+ */
 void boost()
 {
     ajustementPWM(130, 130, avant);
     delayMs(100);
 }
 
-// suivre la ligne afin de se rendre a l'intersection et faire un virage
+/**
+ * Gere la fin des sections du 
+ * parcours.
+ * 
+ */
 void finIntersection()
 {
     // avance tant qu'on n'est pas rendu a l'intersection de la section
@@ -201,6 +244,10 @@ void finIntersection()
     compteur.nombreSection++;
 }
 
+/**
+ * Effectue le couloir.
+ * 
+ */
 void couloir()
 {
     boost();
@@ -294,6 +341,10 @@ void couloir()
     section = Etat::mur;
 }
 
+/**
+ * Effectue les coupures.
+ * 
+ */
 void coupure()
 {
     boost();
@@ -360,8 +411,8 @@ void coupure()
             break;
 
         case segmentCoupure::transitionSegment1:
-            delayMs(400);
 
+            delayMs(400);
             ajustementPWM(30, 130, avant);
             delayMs(250);
             compteur.nombreCoupure++;
@@ -375,6 +426,10 @@ void coupure()
     section = Etat::couloir;
 }
 
+/**
+ * Effectue les deux boucles.
+ * 
+ */
 void boucle()
 {
     boost();
@@ -470,7 +525,11 @@ void boucle()
     section = Etat::coupure;
 }
 
-// initialiser les registres et variables pour le fonctionnement du sonar
+/**
+ * Initialise les registres et
+ * variables pour le fonctionnement du sonar .
+ * 
+ */
 void initialisationSonar()
 {
     cli(); // bloquer toutes les interruptions
@@ -483,7 +542,10 @@ void initialisationSonar()
     sei(); // permet de recevoir à nouveau des interruptions
 }
 
-// section mur
+/**
+ * Effectue le mur.
+ * 
+ */
 void suiveurDeMur()
 {
     boost();
@@ -503,7 +565,7 @@ void suiveurDeMur()
     case segmentMur::sonar:
         while (!POS1 && !POS2 && !POS3 && !POS4 && !POS5)
         {
-            PORTB |= (1 << PB4); //Le PINA envoie le premier pulse durant 15us
+            PORTB |= (1 << PB4); // le PINA envoie le premier pulse durant 15us
             _delay_us(15);
             PORTB &= ~(1 << PB4);
             distance = 2.20 * temps; // on calcul la distance en prenant compte la conversion en micro secondes, la division par 58 et le prescaler
@@ -511,7 +573,7 @@ void suiveurDeMur()
 
             if (distance < 13)
             {
-                ajustementPWM(70, 105, avant); // seloigner du mur si la distance est inferieure a 12 cm
+                ajustementPWM(70, 105, avant); // s'eloigner du mur si la distance est inferieure a 12 cm
                 PORTB = ROUGE;
             }
 
@@ -558,7 +620,11 @@ void suiveurDeMur()
     }
 }
 
-// rendu a la fin du parcours
+/**
+ * Instruction rendu a la fin
+ * du parcour.
+ * 
+ */
 void fin()
 {
     // faire la transition pour revenir au point de depart et arreter les moteurs
@@ -566,7 +632,11 @@ void fin()
     ajustementPWM(0, 0, avant);
 }
 
-// execute chaque section dependemment de l'etat
+/**
+ * Execute chaque section dependemment de l'etat , 
+ * si le bouton poussoir interupt est appuye.
+ * 
+ */
 void gererSection()
 {
     // boucle tant que les quatres sections n'ont pas ete parcourues
@@ -610,7 +680,15 @@ void gererSection()
     }
 }
 
-// bouton poussoir du breadboard pour detecter le demarrage
+/**
+ * Bouton poussoir interupt pour detecter 
+ * le demarrage.
+ *
+ * \param [in] INT0_vect
+ *        Vecteur d'interuption 0.
+ * 
+ * \return Une interuption si le bouton est preser.
+ */
 ISR(INT0_vect)
 {
     commencer = true;
@@ -618,7 +696,16 @@ ISR(INT0_vect)
     EIFR |= (1 << INTF0);
 }
 
-// interruption du bouton-poussoir sur le breadboard
+/**
+ * Interruption du bouton-poussoir 
+ * sur le breadboard pour changer d'etat.
+ *
+ * \param [in] INT1_vect
+ *        Vecteur d'interuption 1.
+ * 
+ * \return Une interuption si le bouton est preser.
+ */
+
 ISR(INT1_vect)
 {
     // vérifier anti-rebond
@@ -638,7 +725,15 @@ ISR(INT1_vect)
     EIFR |= (1 << INTF1);
 }
 
-// interruption du sonar
+/**
+ * Interruption du timer pour le sonar
+ *
+ * \param [in] INT2_vect
+ *        Vecteur d'interuption 2.
+ * 
+ * \return Une interuption lorsque le sonar detect un signal. 
+ */
+
 ISR(INT2_vect)
 {
     if (etatSonar == 0)
@@ -654,7 +749,11 @@ ISR(INT2_vect)
     }
 }
 
-// initialiser les registres et variables globales
+/**
+ * Initialiser les registres 
+ * et variables globales.
+ * 
+ */
 void initialisation()
 {
     // Initialisation des PORTS
